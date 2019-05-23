@@ -4,15 +4,15 @@ clear all
 % FIX: implement noise
 
 %% Setting parameters
-d   = 10;      % Hilbert space dimension
-r   = 6;       % rank of mask projectors; we will use the contiguous family with d projectors scheme
-a   = [0.72];   % orders of frft that will be "measured" 
+d   = 20;      % Hilbert space dimension
+r   = 11;       % rank of mask projectors; we will use the contiguous family with d projectors scheme
+a   = [0.817];   % orders of frft that will be "measured" 
 
 Nproj	= d;
 Nobs	= d*Nproj*numel(a);     % ptychographic projectors * comp. basis projectors
-Nstates = 10;
-noise   = 0;                    % Noise mode: 0 -> none; 1-> poissonian
-noise_av_counts  = 1e01;         % average counts of the poissonian noise (if desired)
+Nstates = 1e04;
+noise   = 1;                    % Noise mode: 0 -> none; 1-> poissonian
+noise_av_counts  = 1e07;         % average counts of the poissonian noise (if desired)
 
 foo   = clock;
 
@@ -22,9 +22,9 @@ if(~noise)
     file_res    = ['./results/ideal-data/d' num2str(d) '_r' num2str(r) '_a' num2str(a) '-' ...
                     num2str(foo(1)) '-' num2str(foo(2)) '-' num2str(foo(3)) '_res.txt']; 
 else
-    file_par    = ['./results/noisy-data/d' num2str(d) '_r' num2str(r) '_a' num2str(a) '_lam' ...
+    file_par    = ['./results/d' num2str(d) '_r' num2str(r) '_a' num2str(a) '_lam' ...
                    sprintf('%2.2e',noise_av_counts) '-' num2str(foo(1)) '-' num2str(foo(2)) '-' num2str(foo(3)) '_par.txt'];
-    file_res    = ['./results/noisy-data/d' num2str(d) '_r' num2str(r) '_a' num2str(a) '_lam' ...
+    file_res    = ['./results/d' num2str(d) '_r' num2str(r) '_a' num2str(a) '_lam' ...
                    sprintf('%2.2e',noise_av_counts) '-' num2str(foo(1)) '-' num2str(foo(2)) '-' num2str(foo(3)) '_res.txt'];           
 end
 
@@ -137,18 +137,19 @@ for q=1:Nstates
     E = sum(Delta);
 
     % Solving SDP
-    SOLUTION = optimize(F,E,sdpsettings('solve','mosek','verbose',0));
+%     SOLUTION = optimize(F,E,sdpsettings('solve','mosek','verbose',0));
+    SOLUTION = optimize(F,E,sdpsettings('solve','sdpt3','verbose',0));
 %     SOLUTION = solvesdp(F,E,sdpsettings('solve','mosek'));
 %     disp('DEBUGGING');
 %     problema = double(SOLUTION.problem);
 %     disp(yalmiperror(problema));
 
     Rho = double(Rho);
-    trace(Rho)
+    trace(Rho);
     Rho = Rho/trace(Rho);
     Delta = double(Delta.');
     dist = hsDistance(rho,Rho);
-    fid = Fidelity(rho,Rho);
+    fid = Fidelity(rho,Rho)
 
     % Writing results to file
     fprintf(fid_res,'%d\t\t%1.12f\t\t%1.12f\n',q,dist,fid);
