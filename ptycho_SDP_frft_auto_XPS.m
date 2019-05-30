@@ -10,7 +10,7 @@ a   = [0.847];   % orders of frft that will be "measured"
 
 Nproj	= d;
 Nobs	= d*Nproj*numel(a);     % ptychographic projectors * comp. basis projectors
-Nstates = 2446;
+Nstates = 1;
 noise   = 1;                    % Noise mode: 0 -> none; 1-> poissonian
 noise_av_counts  = 1e07;         % average counts of the poissonian noise (if desired)
 
