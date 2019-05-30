@@ -12,7 +12,9 @@ Nproj	= d;
 Nobs	= d*Nproj*numel(a);     % ptychographic projectors * comp. basis projectors
 Nstates = 1;
 noise   = 1;                    % Noise mode: 0 -> none; 1-> poissonian
-noise_av_counts  = 1e07;         % average counts of the poissonian noise (if desired)
+snr_fig	= 1e-03;                % Signal-to-Noise Ratio of individual measurements
+noise_av_counts     = d/snr_fig^2;  % I should use lam(d) = d/eta² for the correct scaling with dimension
+% noise_av_counts  = 1e01;        % average counts of the poissonian noise (if desired)
 
 foo   = clock;
 
