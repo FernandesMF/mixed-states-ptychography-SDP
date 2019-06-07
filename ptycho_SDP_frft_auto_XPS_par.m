@@ -4,13 +4,13 @@ clear all
 % FIX: implement noise
 
 %% Setting parameters
-d   = 32;      % Hilbert space dimension
-r   = 17;       % rank of mask projectors; we will use the contiguous family with d projectors scheme
-a   = [0.847];   % orders of frft that will be "measured" 
+d   = 10;      % Hilbert space dimension
+r   = 6;       % rank of mask projectors; we will use the contiguous family with d projectors scheme
+a   = [0.72];   % orders of frft that will be "measured" 
 
 Nproj	= d;
 Nobs	= d*Nproj*numel(a);     % ptychographic projectors * comp. basis projectors
-Nstates = 1;
+Nstates = 10;
 noise   = 1;                    % Noise mode: 0 -> none; 1-> poissonian
 snr_fig	= 1e-03;                % Signal-to-Noise Ratio of individual measurements
 noise_av_counts     = d/snr_fig^2;  % I should use lam(d) = d/eta² for the correct scaling with dimension
@@ -45,10 +45,14 @@ end
 
 % Opening files
 fid_par     = fopen(file_par,'w+');
-fid_res     = fopen(file_res,'w+');
-if( fid_par==-1 || fid_res==-1 )
-    error('Could not open parameter or results file'); 
+if( fid_par==-1 )
+    error('Could not open parameter file'); 
 end
+% fid_par     = fopen(file_par,'w+');
+% fid_res     = fopen(file_res,'w+');
+% if( fid_par==-1 || fid_res==-1 )
+%     error('Could not open parameter or results file'); 
+% end
 
 %% Writing parameters to file
 
@@ -61,6 +65,10 @@ fprintf(fid_par,'Nstates = %d;\n',Nstates);
 fprintf(fid_par,'noise   = %d;  %% Noise mode: 0 -> none; 1-> poissonian\n',noise);
 fprintf(fid_par,'noise_av_counts  = %2.2e %% poissonian noise average counts (if desired)',noise_av_counts);
 
+% Closing parameters file
+if( fclose(fid_par)==-1 )
+    error('Could not close parameters file');
+end
 
 %% Ptychography
 
@@ -84,18 +92,31 @@ for r=1:numel(a)
     end
 end
 
-w   = waitbar(0,'Progress:    0.0');
-for q=1:Nstates
-    waitbar(q/Nstates,w,['Progress:    ' num2str(q/Nstates)]);
+pool = gcp;
+% sdp_files = {which('yalmip'),which('sdpt3'),which('sdpvar'),which('optimize'),...
+%     which('appendYALMIPvariables'),which('rand_hash'),which('definecreationtime'),...
+%     '/home/mario/MATLab_2016a/toolbox/matlab/ops/@double/ge'};
+% addAttachedFiles(pool,sdp_files);
+
+sdp_files = {'/home/mario/Projects/Ptychography-SDP-git/jobStartup.m'};
+addAttachedFiles(pool,sdp_files);
+
+% w   = waitbar(0,'Progress:    0.0');
+parfor q=1:Nstates
+%     waitbar(q/Nstates,w,['Progress:    ' num2str(q/Nstates)]);
     
     % Clearing SDPs variables
-    clear F E Rho Delta
+%     clear F E Rho Delta
+    F	= [];
+    E	= [];
+    Rho = [];
+    Delta   = [];
     
     % Picking a random state
     rho = cubitt_RandomDensityMatrix(d);
 
     % Cleaning yalmip memory
-    yalmip('clear');
+%     yalmip('clear');
     F = class('double');
 
     % Defining the SDP variables
@@ -154,14 +175,21 @@ for q=1:Nstates
     fid = Fidelity(rho,Rho)
 
     % Writing results to file
+    fid_res     = fopen(file_res,'w+');
+    if(fid_res==-1 )
+        error('Could not open results file'); 
+    end
     fprintf(fid_res,'%d\t\t%1.12f\t\t%1.12f\n',q,dist,fid);
+    if( fclose(fid_res)==-1 )
+        error('Could not close results file');
+    end
     
 end
-close(w)
+% close(w)
 %%
 
 
 %% Closing files
-if( fclose(fid_par)==-1 || fclose(fid_res)==-1 )
-    error('Could not close files');
-end
+% if( fclose(fid_par)==-1 || fclose(fid_res)==-1 )
+%     error('Could not close files');
+% end
