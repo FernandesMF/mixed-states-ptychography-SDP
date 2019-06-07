@@ -24,9 +24,9 @@ if(~noise)
     file_res    = ['./results/ideal-data/d' num2str(d) '_r' num2str(r) '_a' num2str(a) '-' ...
                     num2str(foo(1)) '-' num2str(foo(2)) '-' num2str(foo(3)) '_res.txt']; 
 else
-    file_par    = ['./results/d' num2str(d) '_r' num2str(r) '_a' num2str(a) '_lam' ...
+    file_par    = ['./results/noisy-data/d' num2str(d) '_r' num2str(r) '_a' num2str(a) '_lam' ...
                    sprintf('%2.2e',noise_av_counts) '-' num2str(foo(1)) '-' num2str(foo(2)) '-' num2str(foo(3)) '_par.txt'];
-    file_res    = ['./results/d' num2str(d) '_r' num2str(r) '_a' num2str(a) '_lam' ...
+    file_res    = ['./results/noisy-data/d' num2str(d) '_r' num2str(r) '_a' num2str(a) '_lam' ...
                    sprintf('%2.2e',noise_av_counts) '-' num2str(foo(1)) '-' num2str(foo(2)) '-' num2str(foo(3)) '_res.txt'];           
 end
 
@@ -43,16 +43,17 @@ if( exist(file_par,'file') || exist(file_res,'file') )
     end
 end
 
-% Opening files
+% Opening files (and closing results file; it will be opened in the parfor loop)
 fid_par     = fopen(file_par,'w+');
-if( fid_par==-1 )
-    error('Could not open parameter file'); 
+fid_res     = fopen(file_res,'w+');
+if( fid_par==-1 || fid_res==-1 )
+    error('Could not open parameter or results file'); 
 end
-% fid_par     = fopen(file_par,'w+');
-% fid_res     = fopen(file_res,'w+');
-% if( fid_par==-1 || fid_res==-1 )
-%     error('Could not open parameter or results file'); 
-% end
+if( fclose(fid_res)==-1 )
+    error('Could not close results file');
+end
+
+
 
 %% Writing parameters to file
 
@@ -98,7 +99,7 @@ pool = gcp;
 %     '/home/mario/MATLab_2016a/toolbox/matlab/ops/@double/ge'};
 % addAttachedFiles(pool,sdp_files);
 
-sdp_files = {'/home/mario/Projects/Ptychography-SDP-git/jobStartup.m'};
+sdp_files = {'./jobStartup.m'};
 addAttachedFiles(pool,sdp_files);
 
 % w   = waitbar(0,'Progress:    0.0');
@@ -175,7 +176,7 @@ parfor q=1:Nstates
     fid = Fidelity(rho,Rho)
 
     % Writing results to file
-    fid_res     = fopen(file_res,'w+');
+    fid_res     = fopen(file_res,'a');
     if(fid_res==-1 )
         error('Could not open results file'); 
     end
@@ -184,6 +185,7 @@ parfor q=1:Nstates
         error('Could not close results file');
     end
     
+    disp(fid);
 end
 % close(w)
 %%
