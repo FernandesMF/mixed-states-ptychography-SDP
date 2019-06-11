@@ -4,15 +4,17 @@ clear all
 % FIX: implement noise
 
 %% Setting parameters
-d   = 20;      % Hilbert space dimension
-r   = 11;       % rank of mask projectors; we will use the contiguous family with d projectors scheme
-a   = [0.817];   % orders of frft that will be "measured" 
+d   = 10;      % Hilbert space dimension
+r   = 6;       % rank of mask projectors; we will use the contiguous family with d projectors scheme
+a   = [0.72];   % orders of frft that will be "measured" 
 
 Nproj	= d;
 Nobs	= d*Nproj*numel(a);     % ptychographic projectors * comp. basis projectors
-Nstates = 1e04;
+Nstates = 10;
 noise   = 1;                    % Noise mode: 0 -> none; 1-> poissonian
-noise_av_counts  = 1e07;         % average counts of the poissonian noise (if desired)
+snr_fig	= 1e-03;                % Signal-to-Noise Ratio of individual measurements
+noise_av_counts     = d/snr_fig^2;  % I should use lam(d) = d/eta² for the correct scaling with dimension
+% noise_av_counts  = 1e01;        % average counts of the poissonian noise (if desired)
 
 foo   = clock;
 
@@ -22,9 +24,9 @@ if(~noise)
     file_res    = ['./results/ideal-data/d' num2str(d) '_r' num2str(r) '_a' num2str(a) '-' ...
                     num2str(foo(1)) '-' num2str(foo(2)) '-' num2str(foo(3)) '_res.txt']; 
 else
-    file_par    = ['./results/d' num2str(d) '_r' num2str(r) '_a' num2str(a) '_lam' ...
+    file_par    = ['./results/noisy-data/d' num2str(d) '_r' num2str(r) '_a' num2str(a) '_lam' ...
                    sprintf('%2.2e',noise_av_counts) '-' num2str(foo(1)) '-' num2str(foo(2)) '-' num2str(foo(3)) '_par.txt'];
-    file_res    = ['./results/d' num2str(d) '_r' num2str(r) '_a' num2str(a) '_lam' ...
+    file_res    = ['./results/noisy-data/d' num2str(d) '_r' num2str(r) '_a' num2str(a) '_lam' ...
                    sprintf('%2.2e',noise_av_counts) '-' num2str(foo(1)) '-' num2str(foo(2)) '-' num2str(foo(3)) '_res.txt'];           
 end
 
@@ -41,12 +43,17 @@ if( exist(file_par,'file') || exist(file_res,'file') )
     end
 end
 
-% Opening files
+% Opening files (and closing results file; it will be opened in the parfor loop)
 fid_par     = fopen(file_par,'w+');
 fid_res     = fopen(file_res,'w+');
 if( fid_par==-1 || fid_res==-1 )
     error('Could not open parameter or results file'); 
 end
+if( fclose(fid_res)==-1 )
+    error('Could not close results file');
+end
+
+
 
 %% Writing parameters to file
 
@@ -59,6 +66,10 @@ fprintf(fid_par,'Nstates = %d;\n',Nstates);
 fprintf(fid_par,'noise   = %d;  %% Noise mode: 0 -> none; 1-> poissonian\n',noise);
 fprintf(fid_par,'noise_av_counts  = %2.2e %% poissonian noise average counts (if desired)',noise_av_counts);
 
+% Closing parameters file
+if( fclose(fid_par)==-1 )
+    error('Could not close parameters file');
+end
 
 %% Ptychography
 
@@ -82,18 +93,31 @@ for r=1:numel(a)
     end
 end
 
-w   = waitbar(0,'Progress:    0.0');
-for q=1:Nstates
-    waitbar(q/Nstates,w,['Progress:    ' num2str(q/Nstates)]);
+pool = gcp;
+% sdp_files = {which('yalmip'),which('sdpt3'),which('sdpvar'),which('optimize'),...
+%     which('appendYALMIPvariables'),which('rand_hash'),which('definecreationtime'),...
+%     '/home/mario/MATLab_2016a/toolbox/matlab/ops/@double/ge'};
+% addAttachedFiles(pool,sdp_files);
+
+sdp_files = {'./jobStartup.m'};
+addAttachedFiles(pool,sdp_files);
+
+% w   = waitbar(0,'Progress:    0.0');
+parfor q=1:Nstates
+%     waitbar(q/Nstates,w,['Progress:    ' num2str(q/Nstates)]);
     
     % Clearing SDPs variables
-    clear F E Rho Delta
+%     clear F E Rho Delta
+    F	= [];
+    E	= [];
+    Rho = [];
+    Delta   = [];
     
     % Picking a random state
     rho = cubitt_RandomDensityMatrix(d);
 
     % Cleaning yalmip memory
-    yalmip('clear');
+%     yalmip('clear');
     F = class('double');
 
     % Defining the SDP variables
@@ -152,14 +176,22 @@ for q=1:Nstates
     fid = Fidelity(rho,Rho)
 
     % Writing results to file
+    fid_res     = fopen(file_res,'a');
+    if(fid_res==-1 )
+        error('Could not open results file'); 
+    end
     fprintf(fid_res,'%d\t\t%1.12f\t\t%1.12f\n',q,dist,fid);
+    if( fclose(fid_res)==-1 )
+        error('Could not close results file');
+    end
     
+    disp(fid);
 end
-close(w)
+% close(w)
 %%
 
 
 %% Closing files
-if( fclose(fid_par)==-1 || fclose(fid_res)==-1 )
-    error('Could not close files');
-end
+% if( fclose(fid_par)==-1 || fclose(fid_res)==-1 )
+%     error('Could not close files');
+% end
